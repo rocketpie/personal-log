@@ -41,7 +41,7 @@ Param(
 )
 
 $scriptDirectory = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$configFile = Join-Path $scriptDirectory 'log.config.json'
+$configFile = Join-Path $scriptDirectory 'log.ps1.config'
 $config = Get-Content $configFile | ConvertFrom-Json
 
 $logfileName = $config.logfile
