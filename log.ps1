@@ -45,8 +45,8 @@ Param(
     $List,
 
     # either the entry, or -open: ticket name or -close: ticket resolution or -note: note obvously.
-	[Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Open")]
-	[Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Note")]
+    [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Open")]
+    [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Note")]
     [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Close")]
     [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Log")]
     [string]
@@ -72,15 +72,26 @@ function CollapseTickets($ticketList) {
         
         # list distinct 
         $propertynames = $_.group | ForEach-Object { $_ | Get-Member -MemberType NoteProperty } | ForEach-Object { $_.Name } | Sort-Object -Unique
-		Write-Debug ($propertynames -join ',')
         
         # join all objects properties values
         $allproperties = @{ } 		
-        $_.group | ForEach-Object { $item = $_; $propertynames | ForEach-Object { if($item.$_) { Write-Debug $item.$_;  $allproperties[$_] = $item.$_ } } } 
+        $_.group | ForEach-Object { $item = $_; $propertynames | ForEach-Object { if ($item.$_) { $allproperties[$_] = $item.$_ } } } 
         
-		Write-Debug (($allproperties.GetEnumerator() | %{ "$($_.key)=$($_.value)"}) -join ',')
+        Write-Debug (($allproperties.GetEnumerator() | % { "$($_.key)=$($_.value)" }) -join ',')
         
-        New-Object psobject -Property $allproperties		
+        $result = New-Object psobject -Property $allproperties		
+        if ($result.closed) {
+            $open = $result.closed - $result.opened
+            if ($open.TotalDays -lt 1) {
+                $open = "$([int]$open.TotalHours)h" 
+            }
+            else {
+                $open = "$([int]$open.TotalDays)d"
+            }
+            $result | Add-Member -MemberType NoteProperty -Name 'open' -Value $open
+        }
+
+        $result
     } 
 }
 
@@ -98,7 +109,7 @@ switch ($PSCmdlet.ParameterSetName) {
         "latest 10 entries:"
         gc $logfileName -Tail 10
         "`nopen tickets:"
-        CollapseTickets $ticketList | Where-Object { -not $_.closed }
+        CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'name', 'note', 'opened'
     }
 
     'Open' {
@@ -121,15 +132,15 @@ switch ($PSCmdlet.ParameterSetName) {
     'List' {
         switch ($List) {
             'all' {
-                CollapseTickets $ticketList
+                CollapseTickets $ticketList | Format-Table -Property 'id', 'name', 'note', 'resolution', 'opened', 'closed', 'open'
             }
 
             'open' {
-                CollapseTickets $ticketList | Where-Object { -not $_.closed }
+                CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'name', 'note', 'opened'
             }
 
             'closed' {
-                CollapseTickets $ticketList | Where-Object { $_.closed }
+                CollapseTickets $ticketList | Where-Object { $_.closed } | Format-Table -Property 'id', 'name', 'note', 'resolution', 'opened', 'closed', 'open'
             }
 			
             default { Write-Error "af1 not implemented: -List $($List)" }
