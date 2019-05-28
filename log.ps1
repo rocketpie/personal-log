@@ -20,11 +20,11 @@
         log -note 5 'add a note to a ticket'
 
 #>
-[CmdletBinding(DefaultParameterSetName = "Help")]
+[CmdletBinding(DefaultParameterSetName = "View")]
 Param(	
-    [Parameter(Position = 0, ParameterSetName = "Help")]
-    [switch]
-    $Help,
+    [Parameter(Position = 0, ParameterSetName = "View")]
+    [int]
+    $View = 30,
 	
     [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Open")]	
     [switch]
@@ -105,9 +105,13 @@ $ticketList = GetTicketList($logfileName)
 
 Write-Debug "parameter set name: $($PSCmdlet.ParameterSetName)"
 switch ($PSCmdlet.ParameterSetName) {
-    'Help' {
-        "latest 10 entries:"
-        gc $logfileName -Tail 10
+    'View' {
+        "log [-View] [20]                       | [this view]: help, log, tickets"
+        "log -Open <Ticket Description>         | open a new ticket, providing a description"
+        "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
+
+        "`nlatest $View entries:"
+        gc $logfileName -Tail $View
         "`nopen tickets:"
         CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'name', 'note', 'opened'
     }
