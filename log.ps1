@@ -106,6 +106,7 @@ $ticketList = GetTicketList($logfileName)
 Write-Debug "parameter set name: $($PSCmdlet.ParameterSetName)"
 switch ($PSCmdlet.ParameterSetName) {
     'View' {
+        Clear-Host
         "log [-View] [20]                       | [this view]: help, log, tickets"
         "log -Open <Ticket Description>         | open a new ticket, providing a description"
         "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
