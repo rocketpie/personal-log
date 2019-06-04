@@ -57,8 +57,12 @@ if ($PSBoundParameters['Debug']) {
     $DebugPreference = 'Continue'
 }
 
+function isTicket($line) {
+    $line.StartsWith('OPEN') -or $line.StartsWith('NOTE') -or $line.StartsWith('CLOSE') 
+}
+
 function GetTicketList($logfileName) {
-    Get-Content $logfileName | Where-Object { $_.StartsWith('OPEN') -or $_.StartsWith('NOTE') -or $_.StartsWith('CLOSE') } | ForEach-Object { $_.SubString($_.IndexOf(' ') + 1) | ConvertFrom-Json } | ForEach-Object {
+    Get-Content $logfileName | Where-Object { isTicket $_ } | ForEach-Object { $_.SubString($_.IndexOf(' ') + 1) | ConvertFrom-Json } | ForEach-Object {
         $_.id = [int]$_.id
         if ($_.opened) { $_.opened = [datetime]::Parse($_.opened) }
         if ($_.closed) { $_.closed = [datetime]::Parse($_.closed) }
@@ -112,7 +116,7 @@ switch ($PSCmdlet.ParameterSetName) {
         "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
 
         "`nlatest $View entries:"
-        gc $logfileName -Tail $View
+        gc $logfileName -Tail $View | %{ if(isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
         "`nopen tickets:"
         CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'name', 'note', 'opened'
     }
