@@ -111,9 +111,10 @@ Write-Debug "parameter set name: $($PSCmdlet.ParameterSetName)"
 switch ($PSCmdlet.ParameterSetName) {
     'View' {
         Clear-Host
-        "log [-View] [20]                       | [this view]: help, log, tickets"
+        "log [-View] [30]                       | [this view]: help, log, tickets"
         "log -Open <Ticket Description>         | open a new ticket, providing a description"
-        "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
+        "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment" 
+        "log -List all|open|closed              | show all/open/closed tickets"        
 
         "`nlatest $View entries:"
         gc $logfileName -Tail $View | %{ if(isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
