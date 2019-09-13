@@ -108,11 +108,7 @@ function CollapseTickets($ticketList) {
         if ($result.closed) {
             $result | Add-Member -MemberType NoteProperty -Name 'open' -Value (PrintSpan $result.opened $result.closed)
         }
-
-        if($result.note) {
-            $result.title = "* $($result.title)"
-        }
-
+       
         $result
     }
     
@@ -129,6 +125,11 @@ $dateFormat = 'ddd, yyyy-MM-dd HH:mm:ss'
 if($config.dateFormat) {
     $dateFormat = $config.dateFormat
 }
+$tableDateFormat = 'ddd, dd.MM.';
+if($config.tableDateFormat) {
+    $tableDateFormat = $config.tableDateFormat
+}
+
 $date = (Get-Date -f $dateFormat)
 
 $ticketList = GetTicketList($logfileName)
@@ -146,7 +147,7 @@ switch ($PSCmdlet.ParameterSetName) {
         "`nlatest $Tail entries:"
         gc $logfileName -Tail $Tail | %{ if(isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
         "`nopen tickets:"
-        CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'title', 'opened'
+        CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', @{ Label='opened'; Expression={ $_.opened.ToString($tableDateFormat) } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
     }
 
     'Open' {
@@ -179,7 +180,6 @@ switch ($PSCmdlet.ParameterSetName) {
         }
     }    
     
-
     'Close' {
         "CLOSE { 'id':'$($Close)', 'closed':'$date', 'resolution':'$Message' }" >> $logfileName
     }
@@ -187,15 +187,15 @@ switch ($PSCmdlet.ParameterSetName) {
     'Filter' {
         switch ($Filter) {
             'all' {
-                CollapseTickets $ticketList | Format-Table -Property 'id', 'title', 'note', 'resolution', 'opened', 'closed', 'open'
+                CollapseTickets $ticketList | Format-Table 'id', @{ Label='since'; Expression={ if($_.closed) {$_.closed.ToString($tableDateFormat) } else {$_.opened.ToString($tableDateFormat)} } }, @{ Label=''; Expression={ if($_.closed) {'-'} } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
             }
 
             'open' {
-                CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'title', 'note', 'opened'
+                CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', @{ Label='opened'; Expression={ $_.opened.ToString($tableDateFormat) } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
             }
 
             'closed' {
-                CollapseTickets $ticketList | Where-Object { $_.closed } | Format-Table -Property 'id', 'title', 'note', 'resolution', 'opened', 'closed', 'open'
+                CollapseTickets $ticketList | Where-Object { $_.closed } | Format-Table -Property 'id', @{ Label='closed'; Expression={ $_.closed.ToString($tableDateFormat) } }, @{ Label='after'; Expression={ $_.open } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
             }
 			
             default { Write-Error "af1 not implemented: -Filter $($Filter)" }
