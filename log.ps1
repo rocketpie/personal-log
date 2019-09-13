@@ -101,14 +101,21 @@ function CollapseTickets($ticketList) {
         
         # join all objects properties values
         $allproperties = @{ } 		
-        #$_.group | ForEach-Object { $item = $_; $propertynames | ForEach-Object { if ($item.$_) { $allproperties[$_] = $item.$_ } } }         
-        $_.group | ForEach-Object { $item = $_; $propertynames | ForEach-Object { if($item.$_) { $allproperties[$_] = $item.$_ } } }     
-        $result = New-Object psobject -Property $allproperties		
+        $_.group | ForEach-Object { $item = $_; $propertynames | ForEach-Object { if ($item.$_) { $allproperties[$_] = $item.$_ } } }         
         
-        if ($result.closed) {
-            $result | Add-Member -MemberType NoteProperty -Name 'open' -Value (PrintSpan $result.opened $result.closed)
+        $opened = $allproperties['opened']
+        if ($allproperties.ContainsKey('closed')) {
+            $allproperties['open'] = (PrintSpan $opened $allproperties['closed'])
         }
-       
+        else {
+            $allproperties['open'] = (PrintSpan $opened (date))
+        }        
+
+        $allproperties['opened (open)'] = "$($opened.ToString($tableDateFormat)) ($($allproperties['open']))"
+        
+        if ($allproperties['note']) { $allproperties['n'] = '*' }
+
+        $result = New-Object psobject -Property $allproperties		
         $result
     }
     
@@ -122,11 +129,11 @@ $config = Get-Content $configFile | ConvertFrom-Json
 
 $logfileName = $config.logfile
 $dateFormat = 'ddd, yyyy-MM-dd HH:mm:ss'
-if($config.dateFormat) {
+if ($config.dateFormat) {
     $dateFormat = $config.dateFormat
 }
 $tableDateFormat = 'ddd, dd.MM.';
-if($config.tableDateFormat) {
+if ($config.tableDateFormat) {
     $tableDateFormat = $config.tableDateFormat
 }
 
@@ -145,9 +152,13 @@ switch ($PSCmdlet.ParameterSetName) {
         "log -Filter all|open|closed            | show all/open/closed tickets"
 
         "`nlatest $Tail entries:"
-        gc $logfileName -Tail $Tail | %{ if(isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
+        gc $logfileName -Tail $Tail | % { if (isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
         "`nopen tickets:"
-        CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', @{ Label='opened'; Expression={ $_.opened.ToString($tableDateFormat) } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
+
+        $data = CollapseTickets $ticketList | Where-Object { -not $_.closed };
+        $timer = [System.Diagnostics.Stopwatch]::StartNew();
+        $data | Format-Table -Property 'id', 'opened (open)', 'n', 'title'
+        $timer.Stop(); Write-Debug "TableOutput: $($timer.ElapsedMilliSeconds)ms"
     }
 
     'Open' {
@@ -156,7 +167,7 @@ switch ($PSCmdlet.ParameterSetName) {
             $nextTicketId = ($ticketList | ForEach-Object { $_.id } | Sort-Object -Descending)[0] + 1
         }
         
-        "OPEN { 'id':'$nextTicketId', 'opened':'$date', 'title':'$Message', 'note':null, 'closed':null, 'resolution':null }" >> $logfileName
+        "OPEN { 'id':'$nextTicketId', 'opened':'$date', 'title':'$Message' }" >> $logfileName
     }
 
     'Note' {
@@ -164,16 +175,16 @@ switch ($PSCmdlet.ParameterSetName) {
     }
 
     'View' {
-        $ticketItems = $ticketList | ?{ $_.id -eq $View } 
+        $ticketItems = $ticketList | ? { $_.id -eq $View } 
        
-        $openTicket = $ticketItems | ?{ $_.opened }
+        $openTicket = $ticketItems | ? { $_.opened }
         "opened   : $($openTicket.opened.ToString($dateFormat))"
         "title    : $($openTicket.title)"                    
 
-        $ticketItems | ?{ $_.note } | Format-List -Property 'udate','note'
+        $ticketItems | ? { $_.note } | Format-List -Property 'udate', 'note'
 
-        $closeTicket = $ticketItems | ?{ $_.closed }
-        if($closeTicket){
+        $closeTicket = $ticketItems | ? { $_.closed }
+        if ($closeTicket) {
             $closeTicket.closed = "$($closeTicket.closed.ToString($dateFormat)) (open $(PrintSpan $openTicket.opened $closeTicket.closed))"
             "closed    : $($closeTicket.closed)"
             "resolution: $($closeTicket.resolution)"                    
@@ -187,15 +198,16 @@ switch ($PSCmdlet.ParameterSetName) {
     'Filter' {
         switch ($Filter) {
             'all' {
-                CollapseTickets $ticketList | Format-Table 'id', @{ Label='since'; Expression={ if($_.closed) {$_.closed.ToString($tableDateFormat) } else {$_.opened.ToString($tableDateFormat)} } }, @{ Label=''; Expression={ if($_.closed) {'-'} } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
+                CollapseTickets $ticketList | Format-Table 'id', @{ Label = 'since'; Expression = { if ($_.closed) { $_.closed.ToString($tableDateFormat) } else { $_.opened.ToString($tableDateFormat) } } }, @{ Label = ''; Expression = { if ($_.closed) { '-' } } }, @{ Label = ''; Expression = { if ($_.note) { '*' } } }, 'title'
             }
 
             'open' {
-                CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', @{ Label='opened'; Expression={ $_.opened.ToString($tableDateFormat) } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
+                #CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', @{ Label = 'open'; Expression = { PrintSpan $_.opened (date) } }, @{ Label = ''; Expression = { if ($_.note) { '*' } } }, 'title'
+                CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'opened (open)', 'n', 'title'
             }
 
             'closed' {
-                CollapseTickets $ticketList | Where-Object { $_.closed } | Format-Table -Property 'id', @{ Label='closed'; Expression={ $_.closed.ToString($tableDateFormat) } }, @{ Label='after'; Expression={ $_.open } }, @{ Label=''; Expression={ if($_.note) { '*' } } }, 'title'
+                CollapseTickets $ticketList | Where-Object { $_.closed } | Format-Table -Property 'id', @{ Label = 'closed'; Expression = { $_.closed.ToString($tableDateFormat) } }, @{ Label = 'after'; Expression = { $_.open } }, @{ Label = ''; Expression = { if ($_.note) { '*' } } }, 'title'
             }
 			
             default { Write-Error "af1 not implemented: -Filter $($Filter)" }
