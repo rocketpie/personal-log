@@ -20,11 +20,11 @@
         log -note 5 'add a note to a ticket'
 
 #>
-[CmdletBinding(DefaultParameterSetName = "View")]
+[CmdletBinding(DefaultParameterSetName = "Tail")]
 Param(	
-    [Parameter(Position = 0, ParameterSetName = "View")]
+    [Parameter(Position = 0, ParameterSetName = "Tail")]
     [int]
-    $View = 30,
+    $Tail = 30,
 	
     [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Open")]	
     [switch]
@@ -34,15 +34,19 @@ Param(
     [int]
     $Note,
 
+    [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "View")]	
+    [int]
+    $View,
+
     [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Close")]	
     [int]
     $Close,
 
     # list tickets
-    [Parameter(Mandatory = $true, ParameterSetName = "list")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "Filter")]	
     [string]
     [ValidateSet("all", "open", "closed")]
-    $List,
+    $Filter,
 
     # either the entry, or -open: ticket name or -close: ticket resolution or -note: note obvously.
     [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Open")]
@@ -95,6 +99,10 @@ function CollapseTickets($ticketList) {
             $result | Add-Member -MemberType NoteProperty -Name 'open' -Value $open
         }
 
+        if($result.note) {
+            $result.name = "* $($result.name)"
+        }
+
         $result
     } 
 }
@@ -109,15 +117,16 @@ $ticketList = GetTicketList($logfileName)
 
 Write-Debug "parameter set name: $($PSCmdlet.ParameterSetName)"
 switch ($PSCmdlet.ParameterSetName) {
-    'View' {
+    'Tail' {
         Clear-Host
-        "log [-View] [30]                       | [this view]: help, log, tickets"
-        "log -Open <Ticket Description>         | open a new ticket, providing a description"
-        "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment" 
-        "log -List all|open|closed              | show all/open/closed tickets"        
+        "log [-Tail] [20]                       | [this view]: help, log, tickets"
+        "log -Open <Ticket Description>         | open a new ticket, providing a description"        
+        "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
+        "log -View <Ticket Id>                  | show ticket details"         
+        "log -Filter all|open|closed            | show all/open/closed tickets"
 
-        "`nlatest $View entries:"
-        gc $logfileName -Tail $View | %{ if(isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
+        "`nlatest $Tail entries:"
+        gc $logfileName -Tail $Tail | %{ if(isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
         "`nopen tickets:"
         CollapseTickets $ticketList | Where-Object { -not $_.closed } | Format-Table -Property 'id', 'name', 'note', 'opened'
     }
@@ -132,15 +141,19 @@ switch ($PSCmdlet.ParameterSetName) {
     }
 
     'Note' {
-        "NOTE { 'id':'$($Note)', 'note':'$Message' }" >> $logfileName
+        "NOTE { 'id':'$($Note)', 'udate':'$date', 'note':'$Message' }" >> $logfileName
     }
+
+    'View' {
+        $ticketList | ?{ $_.id -eq $View }
+    }    
 
     'Close' {
         "CLOSE { 'id':'$($Close)', 'closed':'$date', 'resolution':'$Message' }" >> $logfileName
     }
 
-    'List' {
-        switch ($List) {
+    'Filter' {
+        switch ($Filter) {
             'all' {
                 CollapseTickets $ticketList | Format-Table -Property 'id', 'name', 'note', 'resolution', 'opened', 'closed', 'open'
             }
@@ -153,7 +166,7 @@ switch ($PSCmdlet.ParameterSetName) {
                 CollapseTickets $ticketList | Where-Object { $_.closed } | Format-Table -Property 'id', 'name', 'note', 'resolution', 'opened', 'closed', 'open'
             }
 			
-            default { Write-Error "af1 not implemented: -List $($List)" }
+            default { Write-Error "af1 not implemented: -Filter $($Filter)" }
         }
     }
 
