@@ -25,7 +25,11 @@ Param(
     [Parameter(Position = 0, ParameterSetName = "Tail")]
     [int]
     $Tail = 30,
-	
+    
+    [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Search")]	
+    [string]
+    $Search,
+
     [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Open")]	
     [switch]
     $Open,
@@ -43,10 +47,10 @@ Param(
     $Close,
 
     # list tickets
-    [Parameter(Mandatory = $true, ParameterSetName = "Filter")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "Tickets")]	
     [string]
     [ValidateSet("all", "open", "closed")]
-    $Filter,
+    $Tickets,
 
     # either the entry, or -open: ticket name or -close: ticket resolution or -note: note obvously.
     [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Open")]
@@ -67,6 +71,10 @@ function isTicket($line) {
 
 # round and display appropriate representation
 function PrintSpan($start, $end) {
+    if(-not $end) {
+        $end = Get-date
+    }
+
     $timeSpan = $end - $start
     if ($timeSpan.TotalDays -lt 1) {
         "$([int]$timeSpan.TotalHours)h" 
@@ -76,10 +84,10 @@ function PrintSpan($start, $end) {
     }
 }
 
-function GetTicketList($logfileName) {
+function GetTicketList($log) {
     $timer = [System.Diagnostics.Stopwatch]::StartNew();
-    
-    $ticketList = Get-Content $logfileName | Where-Object { isTicket $_ } | ForEach-Object { $_.SubString($_.IndexOf(' ') + 1) | ConvertFrom-Json } | ForEach-Object {
+        
+    $ticketList = $log | Where-Object { isTicket $_ } | ForEach-Object { $_.SubString($_.IndexOf(' ') + 1) | ConvertFrom-Json } | ForEach-Object {
         $_.id = [int]$_.id
         if ($_.opened) { $_.opened = [datetime]::Parse($_.opened) }
         if ($_.closed) { $_.closed = [datetime]::Parse($_.closed) }
@@ -91,6 +99,11 @@ function GetTicketList($logfileName) {
 }
 
 function CollapseTickets($ticketList) {  
+    if(-not $ticketList){
+        Write-Debug "CollapseTickets: 0 tickets merged."
+        return
+    }
+
     $timer = [System.Diagnostics.Stopwatch]::StartNew();
 
     # list distinct properties
@@ -104,13 +117,10 @@ function CollapseTickets($ticketList) {
         $_.group | ForEach-Object { $item = $_; $propertynames | ForEach-Object { if ($item.$_) { $allproperties[$_] = $item.$_ } } }         
         
         $opened = $allproperties['opened']
-        if ($allproperties.ContainsKey('closed')) {
-            $allproperties['open'] = (PrintSpan $opened $allproperties['closed'])
-        }
-        else {
-            $allproperties['open'] = (PrintSpan $opened (date))
-        }        
+        if(-not $opened) { $opened = Get-Date } # when -Search'ing, OPEN tikets can be filtered out, leaving $opened empty
 
+        $allproperties['open'] = (PrintSpan $opened $allproperties['closed'])
+        
         $allproperties['opened (open)'] = "$($opened.ToString($tableDateFormat)) ($($allproperties['open']))"
         
         if ($allproperties['note']) { $allproperties['n'] = '*' }
@@ -139,20 +149,30 @@ if ($config.tableDateFormat) {
 
 $date = (Get-Date -f $dateFormat)
 
-$ticketList = GetTicketList($logfileName)
+$timer = [System.Diagnostics.Stopwatch]::StartNew();
+$log = Get-Content $logfileName
+$timer.Stop(); Write-Debug "Get-Content: $($log.length) entries read in $($timer.ElapsedMilliSeconds)ms"
+if($Search) {
+    $timer = [System.Diagnostics.Stopwatch]::StartNew();
+    $log = $log | ?{ $_ -match $Search }
+    $timer.Stop(); Write-Debug "Search: $($log.length) entries found in $($timer.ElapsedMilliSeconds)ms"
+}
+
+$ticketList = GetTicketList($log)
 
 Write-Debug "parameter set name: $($PSCmdlet.ParameterSetName)"
 switch ($PSCmdlet.ParameterSetName) {
-    'Tail' {
+    { ($_ -eq 'Tail') -or ($_ -eq 'Search') } {
         #Clear-Host
         "log [-Tail <int>]                      | [this view]: help, log, tickets"
+        "log -Search <regex>                    | search log for <regex>"
         "log -Open <Ticket Description>         | open a new ticket, providing a description"        
         "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
         "log -View <Ticket Id>                  | show ticket details"         
-        "log -Filter all|open|closed            | show all/open/closed tickets"
+        "log -Tickets all|open|closed           | show all/open/closed tickets"
 
         "`nlatest $Tail entries:"
-        gc $logfileName -Tail $Tail | % { if (isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
+        $log[[System.Math]::Max(0, ($log.Length - $Tail))..($log.Length - 1)] | % { if (isTicket $_) { Write-Host -ForegroundColor DarkGray $_ } else { $_ } }
         "`nopen tickets:"
 
         $data = CollapseTickets $ticketList | Where-Object { -not $_.closed };
@@ -195,8 +215,8 @@ switch ($PSCmdlet.ParameterSetName) {
         "CLOSE { 'id':'$($Close)', 'closed':'$date', 'resolution':'$Message' }" >> $logfileName
     }
 
-    'Filter' {
-        switch ($Filter) {
+    'Tickets' {
+        switch ($Tickets) {
             'all' {
                 CollapseTickets $ticketList | Format-Table 'id', @{ Label = 'since'; Expression = { if ($_.closed) { $_.closed.ToString($tableDateFormat) } else { $_.opened.ToString($tableDateFormat) } } }, @{ Label = ''; Expression = { if ($_.closed) { '-' } } }, @{ Label = ''; Expression = { if ($_.note) { '*' } } }, 'title'
             }
@@ -210,7 +230,7 @@ switch ($PSCmdlet.ParameterSetName) {
                 CollapseTickets $ticketList | Where-Object { $_.closed } | Format-Table -Property 'id', @{ Label = 'closed'; Expression = { $_.closed.ToString($tableDateFormat) } }, @{ Label = 'after'; Expression = { $_.open } }, @{ Label = ''; Expression = { if ($_.note) { '*' } } }, 'title'
             }
 			
-            default { Write-Error "af1 not implemented: -Filter $($Filter)" }
+            default { Write-Error "af1 not implemented: -Tickets $($Tickets)" }
         }
     }
 
