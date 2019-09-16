@@ -9,7 +9,7 @@
         log 'adding some log message'
 
     .EXAMPLE
-        log -open 'open a new ticket'
+        log -open 'open this new ticket'
 
     .EXAMPLE 
         log -close 5 
@@ -17,7 +17,7 @@
         closes ticket 5
 
     .EXAMPLE 
-        log -note 5 'add a note to a ticket'
+        log -note 5 'adding a note to ticket 5'
 
 #>
 [CmdletBinding(DefaultParameterSetName = "Tail")]
@@ -38,9 +38,9 @@ Param(
     [int]
     $Note,
 
-    [Parameter(Mandatory = $true, ParameterSetName = "View")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "Show")]	
     [int]
-    $View,
+    $Show,
 
     [Parameter(Mandatory = $true, ParameterSetName = "Close")]	
     [int]
@@ -55,7 +55,7 @@ Param(
     # either the entry, or -open: ticket name or -close: ticket resolution or -note: note obvously.
     [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Open")]
     [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Note")]
-    [Parameter(Mandatory = $true, Position = 1, ParameterSetName = "Close")]
+    [Parameter(Mandatory = $false, Position = 1, ParameterSetName = "Close")]
     [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Log")]
     [string]
     $Message
@@ -168,8 +168,8 @@ switch ($PSCmdlet.ParameterSetName) {
         "log <logentry>                         | add an entry to the log"
         "log -Search <regex>                    | search log for <regex>"
         "log -Open <Ticket Description>         | open a new ticket, providing a description"        
+        "log -Show <Ticket Id>                  | show ticket details"         
         "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
-        "log -View <Ticket Id>                  | show ticket details"         
         "log -Tickets all|open|closed           | show all/open/closed tickets"
 
         "`nlatest $Tail entries:"
@@ -195,8 +195,8 @@ switch ($PSCmdlet.ParameterSetName) {
         "NOTE { 'id':'$($Note)', 'udate':'$date', 'note':'$Message' }" >> $logfileName
     }
 
-    'View' {
-        $ticketItems = $ticketList | ? { $_.id -eq $View } 
+    'Show' {
+        $ticketItems = $ticketList | ? { $_.id -eq $Show } 
        
         $openTicket = $ticketItems | ? { $_.opened }
         "opened   : $($openTicket.opened.ToString($dateFormat))"
