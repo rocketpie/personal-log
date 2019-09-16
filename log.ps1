@@ -26,23 +26,23 @@ Param(
     [int]
     $Tail = 30,
     
-    [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Search")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "Search")]	
     [string]
     $Search,
 
-    [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Open")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "Open")]	
     [switch]
     $Open,
 
-    [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Note")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "Note")]	
     [int]
     $Note,
 
-    [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "View")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "View")]	
     [int]
     $View,
 
-    [Parameter(Mandatory = $true, Position = 0, ParameterSetName = "Close")]	
+    [Parameter(Mandatory = $true, ParameterSetName = "Close")]	
     [int]
     $Close,
 
@@ -165,6 +165,7 @@ switch ($PSCmdlet.ParameterSetName) {
     { ($_ -eq 'Tail') -or ($_ -eq 'Search') } {
         Clear-Host
         "log [-Tail <int>]                      | [this view]: help, log, tickets"
+        "log <logentry>                         | add an entry to the log"
         "log -Search <regex>                    | search log for <regex>"
         "log -Open <Ticket Description>         | open a new ticket, providing a description"        
         "log -Note|Close <Ticket Id> <Comment>  | add a note or close a ticket, providing a comment"         
