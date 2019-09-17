@@ -188,11 +188,13 @@ switch ($PSCmdlet.ParameterSetName) {
             $nextTicketId = ($ticketList | ForEach-Object { $_.id } | Sort-Object -Descending)[0] + 1
         }
         
-        "OPEN { 'id':'$nextTicketId', 'opened':'$date', 'title':'$Message' }" >> $logfileName
+        $Message = $Message | ConvertTo-Json
+        "OPEN { 'id':'$nextTicketId', 'opened':'$date', 'title':$Message }" >> $logfileName
     }
 
     'Note' {
-        "NOTE { 'id':'$($Note)', 'udate':'$date', 'note':'$Message' }" >> $logfileName
+        $Message = $Message | ConvertTo-Json
+        "NOTE { 'id':'$($Note)', 'udate':'$date', 'note':$Message }" >> $logfileName
     }
 
     'Show' {
@@ -213,7 +215,13 @@ switch ($PSCmdlet.ParameterSetName) {
     }    
     
     'Close' {
-        "CLOSE { 'id':'$($Close)', 'closed':'$date', 'resolution':'$Message' }" >> $logfileName
+        if($Message){
+            $Message = $Message | ConvertTo-Json
+            "CLOSE { 'id':'$($Close)', 'closed':'$date', 'resolution':$Message }" >> $logfileName
+        }
+        else{
+            "CLOSE { 'id':'$($Close)', 'closed':'$date' }" >> $logfileName
+        }
     }
 
     'Tickets' {
