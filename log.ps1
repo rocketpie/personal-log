@@ -23,6 +23,7 @@
 [CmdletBinding(DefaultParameterSetName = "Tail")]
 Param(	
     [Parameter(Position = 0, ParameterSetName = "Tail")]
+    [Parameter(ParameterSetName = "Search")]
     [int]
     $Tail = 30,
     
