@@ -151,11 +151,13 @@ if ($config.tableDateFormat) {
 $date = (Get-Date -f $dateFormat)
 
 $timer = [System.Diagnostics.Stopwatch]::StartNew();
-$log = Get-Content $logfileName
+$log = @(Get-Content $logfileName -ErrorAction SilentlyContinue)
+if(-not $log) { $log = @() }
 $timer.Stop(); Write-Debug "Get-Content: $($log.length) entries read in $($timer.ElapsedMilliSeconds)ms"
+
 if($Search) {
     $timer = [System.Diagnostics.Stopwatch]::StartNew();
-    $log = $log | ?{ $_ -match $Search }
+    $log = @($log | ?{ $_ -match $Search })
     $timer.Stop(); Write-Debug "Search: $($log.length) entries found in $($timer.ElapsedMilliSeconds)ms"
 }
 
@@ -164,7 +166,7 @@ $ticketList = GetTicketList($log)
 Write-Debug "parameter set name: $($PSCmdlet.ParameterSetName)"
 switch ($PSCmdlet.ParameterSetName) {
     { ($_ -eq 'Tail') -or ($_ -eq 'Search') } {
-        Clear-Host
+        #Clear-Host
         "log [-Tail <int>]                      | [this view]: help, log, tickets"
         "log <logentry>                         | add an entry to the log"
         "log -Search <regex>                    | search log for <regex>"
