@@ -166,7 +166,7 @@ $ticketList = GetTicketList($log)
 Write-Debug "parameter set name: $($PSCmdlet.ParameterSetName)"
 switch ($PSCmdlet.ParameterSetName) {
     { ($_ -eq 'Tail') -or ($_ -eq 'Search') } {
-        Clear-Host
+        #Clear-Host
         "log [-Tail <int>]                      | [this view]: help, log, tickets"
         "log <logentry>                         | add an entry to the log"
         "log -Search <regex>                    | search log for <regex>"
