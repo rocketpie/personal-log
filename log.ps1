@@ -151,11 +151,13 @@ if ($config.tableDateFormat) {
 $date = (Get-Date -f $dateFormat)
 
 $timer = [System.Diagnostics.Stopwatch]::StartNew();
-$log = Get-Content $logfileName
+$log = @(Get-Content $logfileName -ErrorAction SilentlyContinue)
+if(-not $log) { $log = @() }
 $timer.Stop(); Write-Debug "Get-Content: $($log.length) entries read in $($timer.ElapsedMilliSeconds)ms"
+
 if($Search) {
     $timer = [System.Diagnostics.Stopwatch]::StartNew();
-    $log = $log | ?{ $_ -match $Search }
+    $log = @($log | ?{ $_ -match $Search })
     $timer.Stop(); Write-Debug "Search: $($log.length) entries found in $($timer.ElapsedMilliSeconds)ms"
 }
 
