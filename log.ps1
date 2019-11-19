@@ -193,6 +193,7 @@ switch ($PSCmdlet.ParameterSetName) {
         
         $Message = $Message | ConvertTo-Json
         "OPEN { 'id':'$nextTicketId', 'opened':'$date', 'title':$Message }" >> $logfileName
+        "opened ticket $nextTicketId"
     }
 
     'Note' {
